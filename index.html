@@ -174,7 +174,7 @@
 
   <div class="grid">
     <div class="tile live">
-      <div class="label">Aujourd'hui (depuis minuit)</div>
+      <div class="label" id="todayLabel">Aujourd'hui (depuis minuit)</div>
       <div class="val" id="today">0,000000 €</div>
     </div>
     <div class="tile live">
@@ -336,6 +336,7 @@
     $("perH").textContent = fmtSmart(perMs * 3.6e6);
     $("perD").textContent = fmtSmart(perMs * (work ? (WORK_END_H - WORK_START_H) * 3.6e6 : 8.64e7));
     $("perDLabel").textContent = work ? "Par jour travaillé" : "Par jour";
+    $("todayLabel").textContent = work ? "Aujourd'hui (depuis 9 h)" : "Aujourd'hui (depuis minuit)";
     $("perMo").textContent = fmtSmart(salary / 12);
     $("footMode").textContent = work
       ? "Calcul en semaine travaillée : du lundi au vendredi de 9 h à 18 h, rien le week-end ni en dehors des horaires. Jours fériés non déduits."
