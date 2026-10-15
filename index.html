@@ -67,6 +67,30 @@
   }
   .presets button:hover { border-color: var(--accent); color: var(--accent); }
 
+  .mode-label { margin-top: 20px; }
+  .segmented {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  }
+  .segmented button {
+    border: 0; background: transparent; color: var(--muted); border-radius: 9px;
+    padding: 10px 12px; font: 600 14px Inter, sans-serif; cursor: pointer; text-align: center;
+  }
+  .segmented button small { display: block; font-weight: 500; font-size: 12px; margin-top: 2px; }
+  .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  .segmented button[aria-pressed="true"] small { color: var(--accent); }
+
+  .status {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+    font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .status.on::before { animation: pulse 1.2s ease-in-out infinite; }
+  .status.off { background: var(--border); color: var(--muted); }
+  .status[hidden] { display: none; }
+  @keyframes pulse { 50% { opacity: .3; } }
+
   .hero {
     margin-top: 24px;
     background: var(--surface);
@@ -133,12 +157,19 @@
       <button data-v="150000">150 k€</button>
       <button data-v="1000000">1 M€</button>
     </div>
+
+    <label class="mode-label">Mode de calcul</label>
+    <div class="segmented" id="mode" role="group" aria-label="Mode de calcul">
+      <button type="button" data-mode="always" aria-pressed="true">24 h/24, 7 j/7<small>Tu gagnes même en dormant</small></button>
+      <button type="button" data-mode="work" aria-pressed="false">Semaine travaillée<small>Lun–ven, 9 h–18 h</small></button>
+    </div>
   </section>
 
   <section class="hero">
     <div class="label">Gagné depuis que tu es sur cette page</div>
     <div class="big" id="session">0,000000 €</div>
     <div class="sub" id="sessionTime">depuis 0 s</div>
+    <div class="status" id="status" hidden></div>
   </section>
 
   <div class="grid">
@@ -159,12 +190,12 @@
     <div class="tile"><div class="label">Par seconde</div><div class="val" id="perS">–</div></div>
     <div class="tile"><div class="label">Par minute</div><div class="val" id="perMin">–</div></div>
     <div class="tile"><div class="label">Par heure</div><div class="val" id="perH">–</div></div>
-    <div class="tile"><div class="label">Par jour</div><div class="val" id="perD">–</div></div>
+    <div class="tile"><div class="label" id="perDLabel">Par jour</div><div class="val" id="perD">–</div></div>
     <div class="tile"><div class="label">Par mois</div><div class="val" id="perMo">–</div></div>
   </div>
 
   <footer>
-    Calcul en temps calendaire : 24 h/24, 7 j/7, sur la durée réelle de l'année en cours.<br>
+    <span id="footMode">Calcul en temps calendaire : 24 h/24, 7 j/7, sur la durée réelle de l'année en cours.</span><br>
     Rien n'est envoyé nulle part, tout est calculé dans ton navigateur.
   </footer>
 </div>
@@ -174,6 +205,12 @@
   const $ = (id) => document.getElementById(id);
   const input = $("salary");
   const STORAGE_KEY = "salary-flex-counter:salary";
+  const MODE_KEY = "salary-flex-counter:mode";
+
+  // Work schedule: Monday to Friday, 9:00 to 18:00 (local time)
+  const WORK_START_H = 9;
+  const WORK_END_H = 18;
+  const DAY_NAMES = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
   const fmt = (v, d) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v) + " €";
   const fmtSmart = (v) => {
@@ -192,51 +229,150 @@
     return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n);
   }
 
-  // Initial value: URL ?s= > localStorage > default
+  // ---- Time helpers -------------------------------------------------------
+  const isWeekday = (d) => d.getDay() >= 1 && d.getDay() <= 5;
+
+  // Paid milliseconds between timestamps a and b (a <= b) for the current mode.
+  function paidMsBetween(a, b) {
+    if (b <= a) return 0;
+    if (mode === "always") return b - a;
+    let total = 0;
+    const cur = new Date(a);
+    let day = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate());
+    while (day.getTime() < b) {
+      if (isWeekday(day)) {
+        const ws = new Date(day.getFullYear(), day.getMonth(), day.getDate(), WORK_START_H).getTime();
+        const we = new Date(day.getFullYear(), day.getMonth(), day.getDate(), WORK_END_H).getTime();
+        const s = Math.max(a, ws), e = Math.min(b, we);
+        if (e > s) total += e - s;
+      }
+      day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    }
+    return total;
+  }
+
+  function isWorkingNow(now) {
+    const d = new Date(now);
+    const h = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+    return isWeekday(d) && h >= WORK_START_H && h < WORK_END_H;
+  }
+
+  function nextWorkStart(now) {
+    const d = new Date(now);
+    for (let i = 0; i < 8; i++) {
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i, WORK_START_H);
+      if (isWeekday(day) && day.getTime() > now) return day;
+    }
+    return null;
+  }
+
+  function dayWord(from, to) {
+    const a = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const b = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    const diff = Math.round((b - a) / 86400000);
+    if (diff === 0) return "aujourd'hui";
+    if (diff === 1) return "demain";
+    return DAY_NAMES[to.getDay()];
+  }
+
+  function untilLabel(ms) {
+    const totalMin = Math.ceil(ms / 60000);
+    const days = Math.floor(totalMin / 1440);
+    const h = Math.floor((totalMin % 1440) / 60);
+    const m = totalMin % 60;
+    if (days) return `${days} j ${h} h`;
+    if (h) return `${h} h ${String(m).padStart(2, "0")}`;
+    return `${m} min`;
+  }
+
+  // ---- State ---------------------------------------------------------------
   let initial = 40000;
+  let mode = "always";
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && parseSalary(saved)) initial = parseSalary(saved);
+    const savedMode = localStorage.getItem(MODE_KEY);
+    if (savedMode === "work" || savedMode === "always") mode = savedMode;
   } catch (e) {}
-  const urlS = new URLSearchParams(location.search).get("s");
+  const params = new URLSearchParams(location.search);
+  const urlS = params.get("s");
   if (urlS && parseSalary(urlS)) initial = parseSalary(urlS);
+  const urlM = params.get("m");
+  if (urlM === "work" || urlM === "always") mode = urlM;
   input.value = formatInput(initial);
 
   let salary = initial;
   let perMs = 0;
-  let sessionStart = performance.now();
-  let sessionAccum = 0; // € accumulated before last salary change
-  let yearStartMs, yearEndMs, yearLenMs;
+  let sessionStart = Date.now();
+  let sessionAccum = 0; // € earned before the last change of salary or mode
+  let yearStartMs, yearEndMs, yearPaidMs;
+  let cacheDayStart = 0, cachePaidToMidnight = 0; // paid ms from Jan 1 to today's midnight
 
   function computeYear() {
     const now = new Date();
     yearStartMs = new Date(now.getFullYear(), 0, 1).getTime();
     yearEndMs = new Date(now.getFullYear() + 1, 0, 1).getTime();
-    yearLenMs = yearEndMs - yearStartMs;
+    yearPaidMs = paidMsBetween(yearStartMs, yearEndMs);
+    cacheDayStart = 0;
+  }
+
+  function paidSinceYearStart(now) {
+    const d = new Date(now);
+    const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    if (midnight !== cacheDayStart) {
+      cacheDayStart = midnight;
+      cachePaidToMidnight = paidMsBetween(yearStartMs, midnight);
+    }
+    return cachePaidToMidnight + paidMsBetween(midnight, now);
   }
 
   function updateRates() {
     computeYear();
-    perMs = salary / yearLenMs;
+    perMs = salary / yearPaidMs;
+    const work = mode === "work";
     $("perMs").textContent = fmtSmart(perMs);
     $("perS").textContent = fmtSmart(perMs * 1e3);
     $("perMin").textContent = fmtSmart(perMs * 6e4);
     $("perH").textContent = fmtSmart(perMs * 3.6e6);
-    $("perD").textContent = fmtSmart(perMs * 8.64e7);
+    $("perD").textContent = fmtSmart(perMs * (work ? (WORK_END_H - WORK_START_H) * 3.6e6 : 8.64e7));
+    $("perDLabel").textContent = work ? "Par jour travaillé" : "Par jour";
     $("perMo").textContent = fmtSmart(salary / 12);
+    $("footMode").textContent = work
+      ? "Calcul en semaine travaillée : du lundi au vendredi de 9 h à 18 h, rien le week-end ni en dehors des horaires. Jours fériés non déduits."
+      : "Calcul en temps calendaire : 24 h/24, 7 j/7, sur la durée réelle de l'année en cours.";
+    document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  }
+
+  // Freeze what has been earned so far this session, then restart from now with the new rate.
+  function checkpoint() {
+    const now = Date.now();
+    sessionAccum += paidMsBetween(sessionStart, now) * perMs;
+    sessionStart = now;
+  }
+
+  function syncUrl() {
+    const url = new URL(location.href);
+    if (salary) url.searchParams.set("s", String(salary)); else url.searchParams.delete("s");
+    if (mode === "work") url.searchParams.set("m", "work"); else url.searchParams.delete("m");
+    history.replaceState(null, "", url);
   }
 
   function setSalary(n) {
-    // keep what's already been earned this session, restart the slope with the new rate
-    const now = performance.now();
-    sessionAccum += (now - sessionStart) * perMs;
-    sessionStart = now;
+    checkpoint();
     salary = n;
     updateRates();
     try { localStorage.setItem(STORAGE_KEY, String(n)); } catch (e) {}
-    const url = new URL(location.href);
-    if (n) url.searchParams.set("s", String(n)); else url.searchParams.delete("s");
-    history.replaceState(null, "", url);
+    syncUrl();
+  }
+
+  function setMode(m) {
+    if (m === mode) return;
+    checkpoint();
+    mode = m;
+    updateRates();
+    try { localStorage.setItem(MODE_KEY, m); } catch (e) {}
+    syncUrl();
+    updateStatus(Date.now());
   }
 
   input.addEventListener("input", () => setSalary(parseSalary(input.value)));
@@ -248,6 +384,10 @@
     input.value = formatInput(v);
     setSalary(v);
   });
+  $("mode").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b) setMode(b.dataset.mode);
+  });
 
   function durationLabel(ms) {
     const s = Math.floor(ms / 1000);
@@ -257,30 +397,51 @@
     return `depuis ${sec} s`;
   }
 
-  const els = { session: $("session"), sessionTime: $("sessionTime"), today: $("today"), year: $("year"), yearPct: $("yearPct") };
-  const pageOpened = performance.now();
+  const els = { session: $("session"), sessionTime: $("sessionTime"), today: $("today"), year: $("year"), yearPct: $("yearPct"), status: $("status") };
+  const pageOpened = Date.now();
+  let lastStatusUpdate = 0;
+
+  function updateStatus(now) {
+    if (mode !== "work") { els.status.hidden = true; return; }
+    els.status.hidden = false;
+    if (isWorkingNow(now)) {
+      const d = new Date(now);
+      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), WORK_END_H).getTime();
+      els.status.className = "status on";
+      els.status.textContent = `En plein boulot, le compteur tourne (fin dans ${untilLabel(end - now)})`;
+    } else {
+      const next = nextWorkStart(now);
+      const d = new Date(now);
+      const why = isWeekday(d) ? "Hors horaires" : "C'est le week-end";
+      els.status.className = "status off";
+      els.status.textContent = `${why} : compteur à l'arrêt. Reprise ${dayWord(d, next)} à 9 h (dans ${untilLabel(next.getTime() - now)})`;
+    }
+  }
 
   function tick() {
-    const nowPerf = performance.now();
     const now = Date.now();
     if (now >= yearEndMs) updateRates(); // new year rollover
 
-    const sessionEarned = sessionAccum + (nowPerf - sessionStart) * perMs;
+    const sessionEarned = sessionAccum + paidMsBetween(sessionStart, now) * perMs;
     const d = new Date(now);
     const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const todayEarned = (now - midnight) * perMs;
-    const yearEarned = (now - yearStartMs) * perMs;
+    const todayEarned = paidMsBetween(midnight, now) * perMs;
+    const paidYear = paidSinceYearStart(now);
+    const yearEarned = paidYear * perMs;
 
     els.session.textContent = fmt(sessionEarned, 6);
-    els.sessionTime.textContent = durationLabel(nowPerf - pageOpened);
+    els.sessionTime.textContent = durationLabel(now - pageOpened);
     els.today.textContent = fmt(todayEarned, 6);
     els.year.textContent = fmt(yearEarned, 6);
-    els.yearPct.textContent = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(((now - yearStartMs) / yearLenMs) * 100) + " % de l'année écoulée";
+    els.yearPct.textContent = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format((paidYear / yearPaidMs) * 100)
+      + (mode === "work" ? " % des heures travaillées de l'année" : " % de l'année écoulée");
 
+    if (now - lastStatusUpdate > 500) { updateStatus(now); lastStatusUpdate = now; }
     requestAnimationFrame(tick);
   }
 
   updateRates();
+  updateStatus(Date.now());
   requestAnimationFrame(tick);
 })();
 </script>
