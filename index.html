@@ -129,6 +129,61 @@
   footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
   footer a { color: inherit; }
 
+  /* ---- Comparison ---- */
+  :root {
+    --s-toi: #2a78d6; --s-smic: #eb6834; --s-bezos: #1baf7a; --s-musk: #eda100;
+    --grid: #ecebe6; --axis: #c9c7bf;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --s-toi: #3987e5; --s-smic: #d95926; --s-bezos: #199e70; --s-musk: #c98500;
+      --grid: #23262c; --axis: #3a3e46;
+    }
+  }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 40px; }
+  .section-head h2 { margin: 0; }
+  .section-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .segmented.small { grid-template-columns: auto auto; }
+  .segmented.small button { padding: 6px 12px; font-size: 13px; }
+
+  .chart-card {
+    margin-top: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px; box-shadow: var(--shadow); position: relative;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text); margin-bottom: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; }
+  .chart-note { color: var(--muted); font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-size: 12px;
+    box-shadow: var(--shadow); min-width: 180px; z-index: 2;
+  }
+  .tooltip[hidden] { display: none; }
+  .tooltip .t-head { color: var(--muted); margin-bottom: 4px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+  .tooltip .t-row b { font: 600 12px "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+  .tooltip .t-row span { display: inline-flex; align-items: center; gap: 6px; }
+  .tooltip i, .who i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+
+  .people { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+  .who .label { display: flex; align-items: center; gap: 6px; }
+  .who .val { font-size: clamp(15px, 2.4vw, 20px); }
+  .who.me { border-color: var(--s-toi); }
+
+  .facts { margin-top: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .fact { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+  .fact .big { font: 700 clamp(22px, 4vw, 30px)/1.15 "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+  .fact p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 760px) {
+    .people { grid-template-columns: repeat(2, 1fr); }
+    .facts { grid-template-columns: 1fr; }
+    .chart-wrap { height: 260px; }
+  }
+
   @media (max-width: 640px) {
     .wrap { padding-top: 32px; }
     .grid { grid-template-columns: 1fr; }
@@ -150,7 +205,7 @@
       <span>€ / an</span>
     </div>
     <div class="presets" id="presets">
-      <button data-v="21000">SMIC (~21 k€)</button>
+      <button data-v="17735">SMIC (~17,7 k€)</button>
       <button data-v="30000">30 k€</button>
       <button data-v="45000">45 k€</button>
       <button data-v="70000">70 k€</button>
@@ -194,8 +249,48 @@
     <div class="tile"><div class="label">Par mois</div><div class="val" id="perMo">–</div></div>
   </div>
 
+  <div class="section-head">
+    <div>
+      <h2>Toi vs le monde</h2>
+      <p>Ce que chacun a gagné depuis que tu es sur cette page.</p>
+    </div>
+    <div class="segmented small" id="scale" role="group" aria-label="Échelle du graphique">
+      <button type="button" data-scale="linear" aria-pressed="true">Linéaire</button>
+      <button type="button" data-scale="log" aria-pressed="false">Logarithmique</button>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="legend" aria-hidden="true">
+      <span><i style="background:var(--s-toi)"></i>Toi</span>
+      <span><i style="background:var(--s-smic)"></i>SMIC</span>
+      <span><i style="background:var(--s-bezos)"></i>Jeff Bezos</span>
+      <span><i style="background:var(--s-musk)"></i>Elon Musk</span>
+    </div>
+    <div class="chart-wrap" id="chartWrap">
+      <canvas id="chart" role="img" aria-label="Courbes des gains depuis l'ouverture de la page : toi, le SMIC, Jeff Bezos et Elon Musk"></canvas>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+    <div class="chart-note" id="chartNote"></div>
+  </div>
+
+  <div class="people">
+    <div class="tile who me"><div class="label"><i style="background:var(--s-toi)"></i>Toi</div><div class="val" id="cToi">–</div><div class="hint" id="rToi">–</div></div>
+    <div class="tile who"><div class="label"><i style="background:var(--s-smic)"></i>SMIC</div><div class="val" id="cSmic">–</div><div class="hint" id="rSmic">–</div></div>
+    <div class="tile who"><div class="label"><i style="background:var(--s-bezos)"></i>Jeff Bezos</div><div class="val" id="cBezos">–</div><div class="hint" id="rBezos">–</div></div>
+    <div class="tile who"><div class="label"><i style="background:var(--s-musk)"></i>Elon Musk</div><div class="val" id="cMusk">–</div><div class="hint" id="rMusk">–</div></div>
+  </div>
+
+  <div class="facts">
+    <div class="fact"><div class="big" id="fMusk">–</div><p>C'est le temps qu'il faut à Elon Musk pour gagner ton salaire annuel.</p></div>
+    <div class="fact"><div class="big" id="fBezos">–</div><p>C'est le temps qu'il faut à Jeff Bezos pour gagner ton salaire annuel.</p></div>
+    <div class="fact"><div class="big" id="fSmic">–</div><p id="fSmicTxt">–</p></div>
+    <div class="fact"><div class="big" id="fYears">–</div><p id="fYearsTxt">–</p></div>
+  </div>
+
   <footer>
     <span id="footMode">Calcul en temps calendaire : 24 h/24, 7 j/7, sur la durée réelle de l'année en cours.</span><br>
+    Comparaison : SMIC net de 1 477,93 € par mois au 1er juin 2026, il suit le même mode de calcul que toi. Pour Musk et Bezos, ce n'est pas un salaire : c'est le rythme moyen de hausse de leur fortune selon Forbes entre le 17 décembre 2025 et le 2 octobre 2026 (Musk 600 → 919 Md$, Bezos 235,7 → 368 Md$), converti à 1 € = 1,12 $. Ils s'enrichissent 24 h/24, week-end compris.<br>
     Rien n'est envoyé nulle part, tout est calculé dans ton navigateur.
   </footer>
 </div>
@@ -210,6 +305,15 @@
   // Work schedule: Monday to Friday, 9:00 to 18:00 (local time)
   const WORK_START_H = 9;
   const WORK_END_H = 18;
+  // ---- Comparison benchmarks -----------------------------------------------
+  // SMIC net mensuel au 1er juin 2026 (info.gouv.fr) : 1 477,93 EUR x 12
+  const SMIC_NET_ANNUAL = 1477.93 * 12;
+  // Rythme moyen d'enrichissement, Forbes : 17 dec. 2025 -> 2 oct. 2026 (289 jours)
+  // Musk 600 -> 919 Md$, Bezos 235,7 -> 368 Md$. 1 EUR = 1,1216 USD (15 oct. 2026)
+  const USD_PER_EUR = 1.1216;
+  const MUSK_EUR_PER_YEAR = (919e9 - 600e9) / 289 * 365 / USD_PER_EUR;
+  const BEZOS_EUR_PER_YEAR = (368e9 - 235.7e9) / 289 * 365 / USD_PER_EUR;
+
   const DAY_NAMES = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
   const fmt = (v, d) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v) + " €";
@@ -305,6 +409,8 @@
   let perMs = 0;
   let sessionStart = Date.now();
   let sessionAccum = 0; // € earned before the last change of salary or mode
+  let smicAccum = 0, smicPerMs = 0; // same idea for the SMIC benchmark (follows the mode)
+  let yearLenMs = 0;
   let yearStartMs, yearEndMs, yearPaidMs;
   let cacheDayStart = 0, cachePaidToMidnight = 0; // paid ms from Jan 1 to today's midnight
 
@@ -313,6 +419,7 @@
     yearStartMs = new Date(now.getFullYear(), 0, 1).getTime();
     yearEndMs = new Date(now.getFullYear() + 1, 0, 1).getTime();
     yearPaidMs = paidMsBetween(yearStartMs, yearEndMs);
+    yearLenMs = yearEndMs - yearStartMs;
     cacheDayStart = 0;
   }
 
@@ -329,6 +436,7 @@
   function updateRates() {
     computeYear();
     perMs = salary / yearPaidMs;
+    smicPerMs = SMIC_NET_ANNUAL / yearPaidMs;
     const work = mode === "work";
     $("perMs").textContent = fmtSmart(perMs);
     $("perS").textContent = fmtSmart(perMs * 1e3);
@@ -347,15 +455,20 @@
   // Freeze what has been earned so far this session, then restart from now with the new rate.
   function checkpoint() {
     const now = Date.now();
-    sessionAccum += paidMsBetween(sessionStart, now) * perMs;
+    const paid = paidMsBetween(sessionStart, now);
+    sessionAccum += paid * perMs;
+    smicAccum += paid * smicPerMs;
     sessionStart = now;
   }
 
   function syncUrl() {
-    const url = new URL(location.href);
-    if (salary) url.searchParams.set("s", String(salary)); else url.searchParams.delete("s");
-    if (mode === "work") url.searchParams.set("m", "work"); else url.searchParams.delete("m");
-    history.replaceState(null, "", url);
+    // Some embeds (sandboxed iframes, about:srcdoc previews) refuse URL changes: ignore and keep going.
+    try {
+      const url = new URL(location.href);
+      if (salary) url.searchParams.set("s", String(salary)); else url.searchParams.delete("s");
+      if (mode === "work") url.searchParams.set("m", "work"); else url.searchParams.delete("m");
+      history.replaceState(null, "", url);
+    } catch (e) {}
   }
 
   function setSalary(n) {
@@ -441,9 +554,329 @@
     requestAnimationFrame(tick);
   }
 
+  // Shared state for the comparison block below.
+  window.__sfc = {
+    pageOpened,
+    get salary() { return salary; },
+    get mode() { return mode; },
+    smicAnnual: SMIC_NET_ANNUAL,
+    muskAnnual: MUSK_EUR_PER_YEAR,
+    bezosAnnual: BEZOS_EUR_PER_YEAR,
+    // € earned by each person since the page was opened
+    earned(now) {
+      const paid = paidMsBetween(sessionStart, now);
+      const t = now - pageOpened;
+      return {
+        toi: sessionAccum + paid * perMs,
+        smic: smicAccum + paid * smicPerMs,
+        bezos: t * (BEZOS_EUR_PER_YEAR / yearLenMs),
+        musk: t * (MUSK_EUR_PER_YEAR / yearLenMs),
+      };
+    },
+    // € per second right now (0 for you and the SMIC outside working hours in work mode)
+    perSecond(now) {
+      const on = mode === "always" || isWorkingNow(now);
+      return {
+        toi: on ? perMs * 1000 : 0,
+        smic: on ? smicPerMs * 1000 : 0,
+        bezos: BEZOS_EUR_PER_YEAR / yearLenMs * 1000,
+        musk: MUSK_EUR_PER_YEAR / yearLenMs * 1000,
+      };
+    },
+  };
+
   updateRates();
   updateStatus(Date.now());
   requestAnimationFrame(tick);
+})();
+</script>
+<script>
+(function () {
+  const S = window.__sfc;
+  if (!S) return;
+  const $ = (id) => document.getElementById(id);
+  const SCALE_KEY = "salary-flex-counter:scale";
+  const SERIES = [
+    { key: "toi", name: "Toi", color: "--s-toi", digits: 6 },
+    { key: "smic", name: "SMIC", color: "--s-smic", digits: 6 },
+    { key: "bezos", name: "Jeff Bezos", color: "--s-bezos", digits: 2 },
+    { key: "musk", name: "Elon Musk", color: "--s-musk", digits: 2 },
+  ];
+  const YEAR_S = 365 * 86400;
+
+  // ---- Formatting ----------------------------------------------------------
+  const nf = (d) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const eur = (v, d) => nf(d).format(v) + " €";
+  const compactFmt = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
+  const compactLong = new Intl.NumberFormat("fr-FR", { notation: "compact", compactDisplay: "long", maximumFractionDigits: 1 });
+  function compactEur(v) {
+    if (v === 0) return "0 €";
+    if (v < 0.01) return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(v) + " €";
+    if (v < 1) return nf(2).format(v) + " €";
+    if (v < 1000) return nf(v < 10 ? 2 : 0).format(v) + " €";
+    return compactFmt.format(v) + " €";
+  }
+  function perSecLabel(v) {
+    if (v === 0) return "à l'arrêt";
+    return "+" + (v < 1 ? nf(6).format(v) : nf(0).format(v)) + " €/s";
+  }
+  function duration(sec) {
+    if (!isFinite(sec)) return "–";
+    if (sec < 60) return nf(sec < 10 ? 1 : 0).format(sec) + " s";
+    if (sec < 3600) { const m = Math.floor(sec / 60); return `${m} min ${String(Math.round(sec % 60)).padStart(2, "0")} s`; }
+    if (sec < 86400) return nf(1).format(sec / 3600) + " h";
+    return nf(1).format(sec / 86400) + " jours";
+  }
+  function years(y) {
+    if (!isFinite(y)) return "–";
+    if (y >= 1e9) return nf(2).format(y / 1e9) + " milliards d'années";
+    if (y >= 1e6) return nf(2).format(y / 1e6) + " millions d'années";
+    return nf(0).format(y) + " ans";
+  }
+  function elapsedLabel(ms) {
+    const s = ms / 1000;
+    if (s < 60) return Math.round(s) + " s";
+    const m = Math.floor(s / 60);
+    return `${m} min ${String(Math.round(s % 60)).padStart(2, "0")}`;
+  }
+
+  // ---- Scale toggle --------------------------------------------------------
+  let scale = "linear";
+  let lastText = 0;
+  try { if (localStorage.getItem(SCALE_KEY) === "log") scale = "log"; } catch (e) {}
+  function syncScaleButtons() {
+    document.querySelectorAll("#scale button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.scale === scale)));
+  }
+  $("scale").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    scale = b.dataset.scale;
+    try { localStorage.setItem(SCALE_KEY, scale); } catch (err) {}
+    syncScaleButtons();
+    lastText = 0;
+  });
+  syncScaleButtons();
+
+  // ---- Samples -------------------------------------------------------------
+  let samples = [{ t: 0, toi: 0, smic: 0, bezos: 0, musk: 0 }];
+  let sampleEvery = 200;
+  let lastSample = 0;
+  function sample(now) {
+    const t = now - S.pageOpened;
+    if (t - lastSample < sampleEvery) return;
+    lastSample = t;
+    samples.push({ t, ...S.earned(now) });
+    if (samples.length > 3000) { // keep memory bounded on long sessions
+      samples = samples.filter((_, i) => i % 2 === 0 || i === samples.length - 1);
+      sampleEvery *= 2;
+    }
+  }
+
+  // ---- Chart ---------------------------------------------------------------
+  const canvas = $("chart"), wrap = $("chartWrap"), tip = $("tooltip");
+  const ctx = canvas.getContext("2d");
+  let colors = {}, lastColorRead = 0;
+  function readColors(now) {
+    if (now - lastColorRead < 1000) return;
+    lastColorRead = now;
+    const cs = getComputedStyle(document.documentElement);
+    for (const s of SERIES) colors[s.key] = cs.getPropertyValue(s.color).trim();
+    for (const k of ["--text", "--muted", "--grid", "--axis", "--surface"]) colors[k] = cs.getPropertyValue(k).trim();
+  }
+
+  let hoverX = null;
+  canvas.addEventListener("pointermove", (e) => { const r = canvas.getBoundingClientRect(); hoverX = e.clientX - r.left; });
+  canvas.addEventListener("pointerdown", (e) => { const r = canvas.getBoundingClientRect(); hoverX = e.clientX - r.left; });
+  canvas.addEventListener("pointerleave", () => { hoverX = null; tip.hidden = true; });
+
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+
+  function draw(now) {
+    readColors(now);
+    const dpr = window.devicePixelRatio || 1;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const narrow = W < 520;
+    const liveNow = S.earned(now);
+    let labelW = 0;
+    for (const s of SERIES) {
+      const name = narrow ? s.name.replace("Jeff ", "").replace("Elon ", "") : s.name;
+      ctx.font = "600 11px Inter, system-ui, sans-serif";
+      let w = ctx.measureText(name + " ").width;
+      ctx.font = "11px Inter, system-ui, sans-serif";
+      w += ctx.measureText(compactEur(liveNow[s.key])).width;
+      labelW = Math.max(labelW, w);
+    }
+    const pad = { l: 56, r: Math.ceil(labelW) + 26, t: 10, b: 24 };
+    const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+    const live = { t: now - S.pageOpened, ...liveNow };
+    const pts = samples.concat([live]);
+    const tMax = Math.max(live.t, 10000);
+    const xOf = (t) => pad.l + (t / tMax) * pw;
+
+    // y scale
+    const maxV = Math.max(live.musk, live.bezos, live.smic, live.toi, 1e-9);
+    let yOf, ticks = [];
+    if (scale === "linear") {
+      const step = niceStep(maxV / 4 || 1);
+      const yMax = Math.ceil((maxV * 1.02) / step) * step || step;
+      for (let v = 0; v <= yMax + step / 2; v += step) ticks.push(v);
+      yOf = (v) => pad.t + ph - (v / yMax) * ph;
+    } else {
+      const lo = -3; // 0,001 €
+      const hi = Math.max(0, Math.ceil(Math.log10(maxV)));
+      const span = hi - lo || 1;
+      const every = Math.ceil(span / 6);
+      for (let e = lo; e <= hi; e += every) ticks.push(Math.pow(10, e));
+      yOf = (v) => {
+        const l = Math.log10(Math.max(v, Math.pow(10, lo)));
+        return pad.t + ph - ((l - lo) / span) * ph;
+      };
+    }
+
+    // grid + y labels
+    ctx.font = "11px Inter, system-ui, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "right";
+    for (const v of ticks) {
+      const y = Math.round(yOf(v)) + 0.5;
+      ctx.strokeStyle = colors["--grid"]; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pw, y); ctx.stroke();
+      ctx.fillStyle = colors["--muted"];
+      ctx.fillText(compactEur(v), pad.l - 8, y);
+    }
+    // x axis + labels
+    ctx.strokeStyle = colors["--axis"];
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t + ph + 0.5); ctx.lineTo(pad.l + pw, pad.t + ph + 0.5); ctx.stroke();
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = colors["--muted"];
+    const xStep = niceStep(tMax / (narrow ? 3 : 5) / 1000) * 1000;
+    for (let t = 0; t <= tMax + 1; t += xStep) ctx.fillText(elapsedLabel(t), xOf(t), pad.t + ph + 6);
+
+    // lines: biggest first, so "Toi" is drawn last and stays visible on top
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    const minLog = 1e-3;
+    for (const s of SERIES.slice().reverse()) {
+      ctx.strokeStyle = colors[s.key]; ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      for (const p of pts) {
+        const v = p[s.key];
+        if (scale === "log" && v < minLog) { started = false; continue; }
+        const x = xOf(p.t), y = yOf(v);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    // end dots with a surface ring
+    const ends = [];
+    for (const s of SERIES.slice().reverse()) {
+      const v = live[s.key];
+      if (scale === "log" && v < minLog) continue;
+      const x = xOf(live.t), y = yOf(v);
+      ctx.fillStyle = colors["--surface"]; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colors[s.key]; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      ends.push({ s, v, x, y });
+    }
+    // direct labels at the right edge, nudged apart so they never overlap
+    ends.sort((a, b) => a.y - b.y);
+    const gap = 15;
+    ends.forEach((e, i) => { e.ly = i === 0 ? Math.max(e.y, pad.t + 6) : Math.max(e.y, ends[i - 1].ly + gap); });
+    for (let i = ends.length - 1; i >= 0; i--) {
+      const limit = i === ends.length - 1 ? pad.t + ph : ends[i + 1].ly - gap;
+      if (ends[i].ly > limit) ends[i].ly = limit;
+    }
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (const e of ends) {
+      const lx = pad.l + pw + 12;
+      ctx.fillStyle = colors[e.s.key];
+      ctx.beginPath(); ctx.arc(lx, e.ly, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colors["--text"];
+      ctx.font = "600 11px Inter, system-ui, sans-serif";
+      const name = narrow ? e.s.name.replace("Jeff ", "").replace("Elon ", "") : e.s.name;
+      ctx.fillText(name, lx + 7, e.ly);
+      const w = ctx.measureText(name + " ").width;
+      ctx.font = "11px Inter, system-ui, sans-serif";
+      ctx.fillStyle = colors["--muted"];
+      ctx.fillText(compactEur(e.v), lx + 7 + w, e.ly);
+    }
+
+    // hover crosshair + tooltip
+    if (hoverX !== null && hoverX >= pad.l && hoverX <= pad.l + pw) {
+      const t = ((hoverX - pad.l) / pw) * tMax;
+      let lo = 0, hi = pts.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (pts[mid].t < t) lo = mid + 1; else hi = mid; }
+      const p = (lo > 0 && Math.abs(pts[lo - 1].t - t) < Math.abs(pts[lo].t - t)) ? pts[lo - 1] : pts[lo];
+      const x = Math.round(xOf(p.t)) + 0.5;
+      ctx.strokeStyle = colors["--axis"]; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke();
+      for (const s of SERIES) {
+        if (scale === "log" && p[s.key] < minLog) continue;
+        const y = yOf(p[s.key]);
+        ctx.fillStyle = colors["--surface"]; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = colors[s.key]; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      const rows = SERIES.slice().sort((a, b) => p[b.key] - p[a.key])
+        .map((s) => `<div class="t-row"><span><i style="background:${colors[s.key]}"></i>${s.name}</span><b>${eur(p[s.key], s.digits)}</b></div>`).join("");
+      tip.innerHTML = `<div class="t-head">Après ${elapsedLabel(p.t)}</div>${rows}`;
+      tip.hidden = false;
+      const tw = tip.offsetWidth;
+      tip.style.left = (x + 12 + tw > W ? x - 12 - tw : x + 12) + "px";
+      tip.style.top = pad.t + 4 + "px";
+    } else if (hoverX === null) {
+      tip.hidden = true;
+    }
+  }
+
+  // ---- Tiles, facts, note --------------------------------------------------
+  const tileIds = { toi: ["cToi", "rToi"], smic: ["cSmic", "rSmic"], bezos: ["cBezos", "rBezos"], musk: ["cMusk", "rMusk"] };
+  function updateText(now) {
+    const e = S.earned(now), r = S.perSecond(now);
+    for (const s of SERIES) $(tileIds[s.key][0]).textContent = eur(e[s.key], s.digits);
+    if (now - lastText < 250) return;
+    lastText = now;
+    for (const s of SERIES) $(tileIds[s.key][1]).textContent = perSecLabel(r[s.key]);
+
+    const salary = S.salary;
+    const muskPerS = S.muskAnnual / YEAR_S, bezosPerS = S.bezosAnnual / YEAR_S;
+    $("fMusk").textContent = salary ? duration(salary / muskPerS) : "–";
+    $("fBezos").textContent = salary ? duration(salary / bezosPerS) : "–";
+    const ratio = salary / S.smicAnnual;
+    $("fSmic").textContent = salary ? "×" + nf(2).format(ratio) : "–";
+    $("fSmicTxt").textContent = !salary ? "Indique ton salaire pour te comparer au SMIC."
+      : ratio >= 1 ? `Tu gagnes ${nf(2).format(ratio)} fois le SMIC net (1 477,93 € par mois).`
+      : `Tu gagnes ${nf(0).format(ratio * 100)} % du SMIC net (1 477,93 € par mois).`;
+    const y = salary ? S.muskAnnual / salary : Infinity;
+    $("fYears").textContent = salary ? years(y) : "–";
+    $("fYearsTxt").textContent = salary
+      ? `C'est le temps que tu devrais travailler pour gagner ce qu'Elon Musk gagne en un an. L'Homo sapiens existe depuis environ 300 000 ans.`
+      : "Indique ton salaire pour voir le calcul.";
+
+    const off = S.mode === "work" && r.toi === 0;
+    const muskX = salary ? S.muskAnnual / salary : 0;
+    let note = scale === "linear"
+      ? `Ta courbe et celle du SMIC sont écrasées tout en bas : sur une année, Musk gagne ${compactLong.format(muskX)}${muskX >= 1e6 ? " de" : ""} fois plus que toi. Passe en logarithmique pour toutes les voir.`
+      : "Chaque graduation multiplie le montant par 10.";
+    if (off) note += " Hors horaires, toi et le SMIC êtes à l'arrêt ; Bezos et Musk, eux, continuent.";
+    $("chartNote").textContent = salary ? note : "";
+  }
+
+  function loop() {
+    const now = Date.now();
+    sample(now);
+    draw(now);
+    updateText(now);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>
