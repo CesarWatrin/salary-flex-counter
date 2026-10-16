@@ -129,6 +129,41 @@
   footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
   footer a { color: inherit; }
 
+  /* ---- Brut -> net calculator ---- */
+  .brut { margin-top: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+  .brut > summary {
+    cursor: pointer; list-style: none; padding: 12px 14px; font-weight: 600; font-size: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .brut > summary::-webkit-details-marker { display: none; }
+  .brut > summary::after { content: "+"; font: 600 18px/1 Inter, sans-serif; color: var(--muted); }
+  .brut[open] > summary::after { content: "–"; }
+  .brut > summary small { color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .brut-body { padding: 0 14px 14px; display: grid; gap: 12px; }
+  .brut-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .brut-body > *, .brut-row > * { min-width: 0; }
+  .brut label { font-size: 13px; margin-bottom: 6px; }
+  .brut .field { background: var(--surface); }
+  .brut .field input { font-size: 18px; padding: 10px 0; }
+  .brut select {
+    width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+    color: var(--text); font: 500 14px Inter, sans-serif; padding: 12px 10px; appearance: auto;
+  }
+  .brut select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .segmented.unit { grid-template-columns: repeat(3, 1fr); margin-top: 8px; }
+  .segmented.unit button { padding: 6px 8px; font-size: 13px; }
+  .brut input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 8px; }
+  .breakdown { border-top: 1px dashed var(--border); padding-top: 12px; display: grid; gap: 4px; font-size: 14px; }
+  .breakdown div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .breakdown span:last-child { font: 600 14px "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; text-align: right; }
+  .breakdown .minus span { color: var(--muted); }
+  .breakdown .total { font-weight: 700; color: var(--accent); }
+  .breakdown .total span:last-child { font-size: 15px; }
+  .brut-hint { color: var(--muted); font-size: 12px; margin: 0; }
+  .manual-hint { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 0; }
+  .manual-hint[hidden] { display: none; }
+  @media (max-width: 640px) { .brut-row { grid-template-columns: 1fr; } }
+
   /* ---- Comparison ---- */
   :root {
     --s-toi: #2a78d6; --s-smic: #eb6834; --s-bezos: #1baf7a; --s-musk: #eda100;
@@ -212,6 +247,64 @@
       <button data-v="150000">150 k€</button>
       <button data-v="1000000">1 M€</button>
     </div>
+    <p class="manual-hint" id="manualHint" hidden>Montant retouché à la main. Modifie un champ du brut ci-dessous pour le recalculer.</p>
+
+    <details class="brut" id="brut">
+      <summary><span>Calculer depuis mon salaire brut <small>si tu ne connais pas ton net</small></span></summary>
+      <div class="brut-body">
+        <div>
+          <label for="brutAmount">Salaire brut</label>
+          <div class="field">
+            <input id="brutAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="3 000">
+            <span id="brutUnitLabel">€ / mois</span>
+          </div>
+          <div class="segmented unit" id="brutUnit" role="group" aria-label="Période du brut">
+            <button type="button" data-unit="hour" aria-pressed="false">Horaire</button>
+            <button type="button" data-unit="month" aria-pressed="true">Mensuel</button>
+            <button type="button" data-unit="year" aria-pressed="false">Annuel</button>
+          </div>
+        </div>
+        <div class="brut-row">
+          <div>
+            <label for="brutStatus">Statut</label>
+            <select id="brutStatus">
+              <option value="22">Salarié non-cadre (−22 %)</option>
+              <option value="25">Salarié cadre (−25 %)</option>
+              <option value="15">Fonction publique (−15 %)</option>
+              <option value="45">Profession libérale (−45 %)</option>
+              <option value="51">Portage salarial (−51 %)</option>
+            </select>
+          </div>
+          <div>
+            <label for="brutMonths">Nombre de mois de salaire</label>
+            <select id="brutMonths">
+              <option value="12">12 mois</option>
+              <option value="13">13 mois</option>
+              <option value="14">14 mois</option>
+              <option value="15">15 mois</option>
+              <option value="16">16 mois</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="taxRate">Taux de prélèvement à la source</label>
+          <div class="field">
+            <input id="taxRate" type="text" inputmode="decimal" autocomplete="off" value="0">
+            <span>%</span>
+          </div>
+          <input id="taxRange" type="range" min="0" max="45" step="0.1" value="0" aria-label="Taux de prélèvement à la source">
+          <p class="brut-hint">Il est indiqué sur ta fiche de paie ou sur impots.gouv.fr.</p>
+        </div>
+        <div class="breakdown" id="breakdown" aria-live="polite">
+          <div><span>Brut annuel</span><span id="bdBrut">–</span></div>
+          <div class="minus"><span id="bdChargesLabel">Cotisations sociales</span><span id="bdCharges">–</span></div>
+          <div><span>Net avant impôt</span><span id="bdNet">–</span></div>
+          <div class="minus"><span id="bdTaxLabel">Impôt sur le revenu</span><span id="bdTax">–</span></div>
+          <div class="total"><span>Net après impôt</span><span id="bdFinal">–</span></div>
+        </div>
+        <p class="brut-hint">Estimation : les cotisations réelles varient selon ta convention et ta situation. Le montant reste modifiable à la main au-dessus.</p>
+      </div>
+    </details>
 
     <label class="mode-label">Mode de calcul</label>
     <div class="segmented" id="mode" role="group" aria-label="Mode de calcul">
@@ -502,6 +595,117 @@
     const b = e.target.closest("button");
     if (b) setMode(b.dataset.mode);
   });
+
+  // ---- Brut -> net calculator -----------------------------------------------
+  // Estimated social contributions by status, as used by most brut/net simulators.
+  const BRUT_KEY = "salary-flex-counter:brut";
+  const HOURS_PER_MONTH = 151.67; // 35 h/week
+  const brut = {
+    amount: $("brutAmount"), unit: "month", status: $("brutStatus"), months: $("brutMonths"),
+    tax: $("taxRate"), range: $("taxRange"), box: $("brut"),
+  };
+  const UNIT_LABELS = { hour: "€ / heure", month: "€ / mois", year: "€ / an" };
+  const eur0 = (v) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(v) + " €";
+
+  function parseNum(str) {
+    const n = parseFloat(String(str).replace(/[\s\u00a0\u202f€%]/g, "").replace(",", "."));
+    return isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  function brutAnnual() {
+    const a = parseNum(brut.amount.value), m = Number(brut.months.value);
+    if (brut.unit === "hour") return a * HOURS_PER_MONTH * m;
+    if (brut.unit === "month") return a * m;
+    return a;
+  }
+
+  function saveBrut() {
+    try {
+      localStorage.setItem(BRUT_KEY, JSON.stringify({
+        amount: brut.amount.value, unit: brut.unit, status: brut.status.value,
+        months: brut.months.value, tax: brut.tax.value, open: brut.box.open,
+      }));
+    } catch (e) {}
+  }
+
+  function renderBreakdown() {
+    const gross = brutAnnual();
+    const chargesRate = Number(brut.status.value) / 100;
+    const taxRate = Math.min(parseNum(brut.tax.value), 100) / 100;
+    const net = gross * (1 - chargesRate);
+    const tax = net * taxRate;
+    const final = net - tax;
+    const months = Number(brut.months.value);
+    $("bdBrut").textContent = gross ? eur0(gross) : "–";
+    $("bdChargesLabel").textContent = `Cotisations sociales (${brut.status.value} %)`;
+    $("bdCharges").textContent = gross ? "− " + eur0(gross * chargesRate) : "–";
+    $("bdNet").textContent = gross ? `${eur0(net)} (${eur0(net / months)} × ${months})` : "–";
+    $("bdTaxLabel").textContent = `Impôt sur le revenu (${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(taxRate * 100)} %)`;
+    $("bdTax").textContent = gross ? "− " + eur0(tax) : "–";
+    $("bdFinal").textContent = gross ? eur0(final) + " / an" : "–";
+    return final;
+  }
+
+  // Any change in the brut panel recomputes the net after tax and fills the main field.
+  function applyBrut() {
+    const final = renderBreakdown();
+    saveBrut();
+    if (!brutAnnual()) return;
+    const rounded = Math.round(final);
+    input.value = formatInput(rounded);
+    setSalary(rounded);
+    $("manualHint").hidden = true;
+  }
+
+  function setUnit(u) {
+    const prev = brutAnnual();
+    brut.unit = u;
+    $("brutUnitLabel").textContent = UNIT_LABELS[u];
+    document.querySelectorAll("#brutUnit button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.unit === u)));
+    // Convert the typed amount so the yearly gross stays the same.
+    if (prev) {
+      const m = Number(brut.months.value);
+      const v = u === "hour" ? prev / m / HOURS_PER_MONTH : u === "month" ? prev / m : prev;
+      brut.amount.value = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: u === "year" ? 0 : 2 }).format(v);
+    }
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(BRUT_KEY) || "null");
+    if (saved) {
+      brut.amount.value = saved.amount || "";
+      if (saved.status) brut.status.value = saved.status;
+      if (saved.months) brut.months.value = saved.months;
+      if (saved.tax != null) { brut.tax.value = saved.tax; brut.range.value = parseNum(saved.tax); }
+      brut.unit = saved.unit || "month";
+      brut.box.open = !!saved.open;
+    }
+  } catch (e) {}
+  $("brutUnitLabel").textContent = UNIT_LABELS[brut.unit];
+  document.querySelectorAll("#brutUnit button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.unit === brut.unit)));
+  renderBreakdown();
+
+  brut.amount.addEventListener("input", applyBrut);
+  brut.amount.addEventListener("blur", () => {
+    const a = parseNum(brut.amount.value);
+    if (a) brut.amount.value = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(a);
+  });
+  brut.status.addEventListener("change", applyBrut);
+  brut.months.addEventListener("change", applyBrut);
+  $("brutUnit").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    setUnit(b.dataset.unit);
+    applyBrut();
+  });
+  brut.tax.addEventListener("input", () => { brut.range.value = parseNum(brut.tax.value); applyBrut(); });
+  brut.range.addEventListener("input", () => {
+    brut.tax.value = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(Number(brut.range.value));
+    applyBrut();
+  });
+  brut.box.addEventListener("toggle", saveBrut);
+  input.addEventListener("input", () => { if (brutAnnual()) $("manualHint").hidden = false; });
+  $("presets").addEventListener("click", (e) => { if (e.target.closest("button") && brutAnnual()) $("manualHint").hidden = false; });
 
   function durationLabel(ms) {
     const s = Math.floor(ms / 1000);
