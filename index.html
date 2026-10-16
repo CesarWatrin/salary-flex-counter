@@ -60,6 +60,9 @@
     font: 600 24px/1 "JetBrains Mono", monospace; padding: 14px 0; outline: none;
   }
   .field span { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .monthly { margin: 8px 2px 0; font-size: 14px; color: var(--muted); }
+  .monthly b { color: var(--accent); font: 700 16px "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+  .monthly:empty { display: none; }
   .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .presets button {
     border: 1px solid var(--border); background: transparent; color: var(--text);
@@ -154,15 +157,24 @@
   .segmented.unit button { padding: 6px 8px; font-size: 13px; }
   .brut input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 8px; }
   .breakdown { border-top: 1px dashed var(--border); padding-top: 12px; display: grid; gap: 4px; font-size: 14px; }
-  .breakdown div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .breakdown span:last-child { font: 600 14px "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; text-align: right; }
+  .breakdown div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 16px; align-items: baseline; }
+  .breakdown span:not(:first-child) { font: 600 14px "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 84px; }
+  .breakdown .bd-head span { font: 600 12px Inter, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   .breakdown .minus span { color: var(--muted); }
   .breakdown .total { font-weight: 700; color: var(--accent); }
-  .breakdown .total span:last-child { font-size: 15px; }
+  .breakdown .total span:not(:first-child) { font-size: 15px; }
+  .breakdown .total span:nth-child(2) { font-size: 17px; }
   .brut-hint { color: var(--muted); font-size: 12px; margin: 0; }
   .manual-hint { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 0; }
   .manual-hint[hidden] { display: none; }
-  @media (max-width: 640px) { .brut-row { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .brut-row { grid-template-columns: 1fr; }
+    .breakdown { font-size: 13px; }
+    .breakdown div { gap: 4px 10px; }
+    .breakdown span:not(:first-child), .breakdown .total span:not(:first-child) { font-size: 12.5px; min-width: 0; }
+    .breakdown .total span:nth-child(2) { font-size: 14px; }
+    .breakdown .bd-head span { font-size: 10.5px; letter-spacing: .03em; }
+  }
 
   /* ---- Comparison ---- */
   :root {
@@ -185,9 +197,19 @@
     margin-top: 12px; background: var(--surface); border: 1px solid var(--border);
     border-radius: 16px; padding: 16px; box-shadow: var(--shadow); position: relative;
   }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text); margin-bottom: 8px; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin-bottom: 10px; }
+  .legend-item {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--text); font: 500 13px Inter, sans-serif;
+  }
+  button.legend-item { cursor: pointer; }
+  button.legend-item:hover { border-color: var(--muted); }
+  button.legend-item[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+  button.legend-item[aria-pressed="false"] i { background: var(--border) !important; }
+  .legend-item.fixed { border-style: dashed; }
   .legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .legend small { color: var(--muted); font-size: 12px; }
+  .who.off { opacity: .45; }
   .chart-wrap { position: relative; height: 320px; }
   .chart-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; }
   .chart-note { color: var(--muted); font-size: 12px; margin-top: 8px; min-height: 18px; }
@@ -239,6 +261,7 @@
       <input id="salary" type="text" inputmode="decimal" autocomplete="off" placeholder="40 000" value="40 000">
       <span>€ / an</span>
     </div>
+    <p class="monthly" id="monthlyNet" aria-live="polite"></p>
     <div class="presets" id="presets">
       <button data-v="17735">SMIC (~17,7 k€)</button>
       <button data-v="30000">30 k€</button>
@@ -296,11 +319,12 @@
           <p class="brut-hint">Il est indiqué sur ta fiche de paie ou sur impots.gouv.fr.</p>
         </div>
         <div class="breakdown" id="breakdown" aria-live="polite">
-          <div><span>Brut annuel</span><span id="bdBrut">–</span></div>
-          <div class="minus"><span id="bdChargesLabel">Cotisations sociales</span><span id="bdCharges">–</span></div>
-          <div><span>Net avant impôt</span><span id="bdNet">–</span></div>
-          <div class="minus"><span id="bdTaxLabel">Impôt sur le revenu</span><span id="bdTax">–</span></div>
-          <div class="total"><span>Net après impôt</span><span id="bdFinal">–</span></div>
+          <div class="bd-head"><span></span><span id="bdMonthHead">Par mois</span><span>Par an</span></div>
+          <div><span>Brut</span><span id="bdBrutM">–</span><span id="bdBrut">–</span></div>
+          <div class="minus"><span id="bdChargesLabel">Cotisations sociales</span><span id="bdChargesM">–</span><span id="bdCharges">–</span></div>
+          <div><span>Net avant impôt</span><span id="bdNetM">–</span><span id="bdNet">–</span></div>
+          <div class="minus"><span id="bdTaxLabel">Impôt sur le revenu</span><span id="bdTaxM">–</span><span id="bdTax">–</span></div>
+          <div class="total"><span>Net après impôt</span><span id="bdFinalM">–</span><span id="bdFinal">–</span></div>
         </div>
         <p class="brut-hint">Estimation : les cotisations réelles varient selon ta convention et ta situation. Le montant reste modifiable à la main au-dessus.</p>
       </div>
@@ -354,11 +378,12 @@
   </div>
 
   <div class="chart-card">
-    <div class="legend" aria-hidden="true">
-      <span><i style="background:var(--s-toi)"></i>Toi</span>
-      <span><i style="background:var(--s-smic)"></i>SMIC</span>
-      <span><i style="background:var(--s-bezos)"></i>Jeff Bezos</span>
-      <span><i style="background:var(--s-musk)"></i>Elon Musk</span>
+    <div class="legend" id="legend" role="group" aria-label="Courbes affichées">
+      <span class="legend-item fixed"><i style="background:var(--s-toi)"></i>Toi</span>
+      <button type="button" class="legend-item" data-series="smic" aria-pressed="true"><i style="background:var(--s-smic)"></i>SMIC</button>
+      <button type="button" class="legend-item" data-series="bezos" aria-pressed="true"><i style="background:var(--s-bezos)"></i>Jeff Bezos</button>
+      <button type="button" class="legend-item" data-series="musk" aria-pressed="true"><i style="background:var(--s-musk)"></i>Elon Musk</button>
+      <small>Clique pour afficher ou masquer</small>
     </div>
     <div class="chart-wrap" id="chartWrap">
       <canvas id="chart" role="img" aria-label="Courbes des gains depuis l'ouverture de la page : toi, le SMIC, Jeff Bezos et Elon Musk"></canvas>
@@ -369,9 +394,9 @@
 
   <div class="people">
     <div class="tile who me"><div class="label"><i style="background:var(--s-toi)"></i>Toi</div><div class="val" id="cToi">–</div><div class="hint" id="rToi">–</div></div>
-    <div class="tile who"><div class="label"><i style="background:var(--s-smic)"></i>SMIC</div><div class="val" id="cSmic">–</div><div class="hint" id="rSmic">–</div></div>
-    <div class="tile who"><div class="label"><i style="background:var(--s-bezos)"></i>Jeff Bezos</div><div class="val" id="cBezos">–</div><div class="hint" id="rBezos">–</div></div>
-    <div class="tile who"><div class="label"><i style="background:var(--s-musk)"></i>Elon Musk</div><div class="val" id="cMusk">–</div><div class="hint" id="rMusk">–</div></div>
+    <div class="tile who" data-who="smic"><div class="label"><i style="background:var(--s-smic)"></i>SMIC</div><div class="val" id="cSmic">–</div><div class="hint" id="rSmic">–</div></div>
+    <div class="tile who" data-who="bezos"><div class="label"><i style="background:var(--s-bezos)"></i>Jeff Bezos</div><div class="val" id="cBezos">–</div><div class="hint" id="rBezos">–</div></div>
+    <div class="tile who" data-who="musk"><div class="label"><i style="background:var(--s-musk)"></i>Elon Musk</div><div class="val" id="cMusk">–</div><div class="hint" id="rMusk">–</div></div>
   </div>
 
   <div class="facts">
@@ -539,6 +564,7 @@
     $("perDLabel").textContent = work ? "Par jour travaillé" : "Par jour";
     $("todayLabel").textContent = work ? "Aujourd'hui (depuis 9 h)" : "Aujourd'hui (depuis minuit)";
     $("perMo").textContent = fmtSmart(salary / 12);
+    if (typeof updateMonthly === "function") updateMonthly();
     $("footMode").textContent = work
       ? "Calcul en semaine travaillée : du lundi au vendredi de 9 h à 18 h, rien le week-end ni en dehors des horaires. Jours fériés non déduits."
       : "Calcul en temps calendaire : 24 h/24, 7 j/7, sur la durée réelle de l'année en cours.";
@@ -636,13 +662,18 @@
     const tax = net * taxRate;
     const final = net - tax;
     const months = Number(brut.months.value);
-    $("bdBrut").textContent = gross ? eur0(gross) : "–";
-    $("bdChargesLabel").textContent = `Cotisations sociales (${brut.status.value} %)`;
-    $("bdCharges").textContent = gross ? "− " + eur0(gross * chargesRate) : "–";
-    $("bdNet").textContent = gross ? `${eur0(net)} (${eur0(net / months)} × ${months})` : "–";
-    $("bdTaxLabel").textContent = `Impôt sur le revenu (${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(taxRate * 100)} %)`;
-    $("bdTax").textContent = gross ? "− " + eur0(tax) : "–";
-    $("bdFinal").textContent = gross ? eur0(final) + " / an" : "–";
+    const both = (id, v, minus) => {
+      $(id).textContent = gross ? (minus ? "− " : "") + eur0(v) : "–";
+      $(id + "M").textContent = gross ? (minus ? "− " : "") + eur0(v / months) : "–";
+    };
+    $("bdMonthHead").textContent = months === 12 ? "Par mois" : `Par mois (×${months})`;
+    both("bdBrut", gross);
+    $("bdChargesLabel").textContent = `Cotisations (${brut.status.value} %)`;
+    both("bdCharges", gross * chargesRate, true);
+    both("bdNet", net);
+    $("bdTaxLabel").textContent = `Impôt (${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(taxRate * 100)} %)`;
+    both("bdTax", tax, true);
+    both("bdFinal", final);
     return final;
   }
 
@@ -655,6 +686,14 @@
     input.value = formatInput(rounded);
     setSalary(rounded);
     $("manualHint").hidden = true;
+  }
+
+  // Monthly net after tax, shown under the yearly field (spread over the brut's number of months).
+  function updateMonthly() {
+    const el = $("monthlyNet");
+    if (!salary) { el.textContent = ""; return; }
+    const m = brutAnnual() ? Number(brut.months.value) : 12;
+    el.innerHTML = `soit <b>${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(salary / m)} €</b> net après impôt par mois${m === 12 ? "" : ` sur ${m} mois`}`;
   }
 
   function setUnit(u) {
@@ -861,6 +900,26 @@
   });
   syncScaleButtons();
 
+  // ---- Series toggles (you are always shown) -------------------------------
+  const HIDDEN_KEY = "salary-flex-counter:hidden";
+  let hidden = new Set();
+  try { hidden = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]")); } catch (e) {}
+  const shown = () => SERIES.filter((s) => s.key === "toi" || !hidden.has(s.key));
+  function syncLegend() {
+    document.querySelectorAll("#legend button").forEach((b) => b.setAttribute("aria-pressed", String(!hidden.has(b.dataset.series))));
+    document.querySelectorAll(".who[data-who]").forEach((t) => t.classList.toggle("off", hidden.has(t.dataset.who)));
+  }
+  $("legend").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const k = b.dataset.series;
+    if (hidden.has(k)) hidden.delete(k); else hidden.add(k);
+    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden])); } catch (err) {}
+    syncLegend();
+    lastText = 0;
+  });
+  syncLegend();
+
   // ---- Samples -------------------------------------------------------------
   let samples = [{ t: 0, toi: 0, smic: 0, bezos: 0, musk: 0 }];
   let sampleEvery = 200;
@@ -911,8 +970,9 @@
 
     const narrow = W < 520;
     const liveNow = S.earned(now);
+    const vis = shown();
     let labelW = 0;
-    for (const s of SERIES) {
+    for (const s of vis) {
       const name = narrow ? s.name.replace("Jeff ", "").replace("Elon ", "") : s.name;
       ctx.font = "600 11px Inter, system-ui, sans-serif";
       let w = ctx.measureText(name + " ").width;
@@ -928,7 +988,7 @@
     const xOf = (t) => pad.l + (t / tMax) * pw;
 
     // y scale
-    const maxV = Math.max(live.musk, live.bezos, live.smic, live.toi, 1e-9);
+    const maxV = Math.max(...vis.map((s) => live[s.key]), 1e-9);
     let yOf, ticks = [];
     if (scale === "linear") {
       const step = niceStep(maxV / 4 || 1);
@@ -968,7 +1028,7 @@
     // lines: biggest first, so "Toi" is drawn last and stays visible on top
     ctx.lineJoin = "round"; ctx.lineCap = "round";
     const minLog = 1e-3;
-    for (const s of SERIES.slice().reverse()) {
+    for (const s of vis.slice().reverse()) {
       ctx.strokeStyle = colors[s.key]; ctx.lineWidth = 2;
       ctx.beginPath();
       let started = false;
@@ -982,7 +1042,7 @@
     }
     // end dots with a surface ring
     const ends = [];
-    for (const s of SERIES.slice().reverse()) {
+    for (const s of vis.slice().reverse()) {
       const v = live[s.key];
       if (scale === "log" && v < minLog) continue;
       const x = xOf(live.t), y = yOf(v);
@@ -1022,13 +1082,13 @@
       const x = Math.round(xOf(p.t)) + 0.5;
       ctx.strokeStyle = colors["--axis"]; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke();
-      for (const s of SERIES) {
+      for (const s of vis) {
         if (scale === "log" && p[s.key] < minLog) continue;
         const y = yOf(p[s.key]);
         ctx.fillStyle = colors["--surface"]; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = colors[s.key]; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
       }
-      const rows = SERIES.slice().sort((a, b) => p[b.key] - p[a.key])
+      const rows = vis.slice().sort((a, b) => p[b.key] - p[a.key])
         .map((s) => `<div class="t-row"><span><i style="background:${colors[s.key]}"></i>${s.name}</span><b>${eur(p[s.key], s.digits)}</b></div>`).join("");
       tip.innerHTML = `<div class="t-head">Après ${elapsedLabel(p.t)}</div>${rows}`;
       tip.hidden = false;
@@ -1065,11 +1125,14 @@
       : "Indique ton salaire pour voir le calcul.";
 
     const off = S.mode === "work" && r.toi === 0;
-    const muskX = salary ? S.muskAnnual / salary : 0;
-    let note = scale === "linear"
-      ? `Ta courbe et celle du SMIC sont écrasées tout en bas : sur une année, Musk gagne ${compactLong.format(muskX)}${muskX >= 1e6 ? " de" : ""} fois plus que toi. Passe en logarithmique pour toutes les voir.`
-      : "Chaque graduation multiplie le montant par 10.";
-    if (off) note += " Hors horaires, toi et le SMIC êtes à l'arrêt ; Bezos et Musk, eux, continuent.";
+    const top = !hidden.has("musk") ? { name: "Musk", annual: S.muskAnnual }
+      : !hidden.has("bezos") ? { name: "Bezos", annual: S.bezosAnnual } : null;
+    const topX = salary && top ? top.annual / salary : 0;
+    let note = scale === "log" ? "Chaque graduation multiplie le montant par 10."
+      : top ? `Ta courbe${hidden.has("smic") ? "" : " et celle du SMIC"} ${hidden.has("smic") ? "est écrasée" : "sont écrasées"} tout en bas : sur une année, ${top.name} gagne ${compactLong.format(topX)}${topX >= 1e6 ? " de" : ""} fois plus que toi. Passe en logarithmique pour toutes les voir.`
+      : "";
+    if (off) note += (note ? " " : "") + (hidden.has("smic") ? "Hors horaires, ta courbe est à l'arrêt." : "Hors horaires, toi et le SMIC êtes à l'arrêt.")
+      + (top ? ` ${hidden.has("bezos") || hidden.has("musk") ? top.name + ", lui, continue." : "Bezos et Musk, eux, continuent."}` : "");
     $("chartNote").textContent = salary ? note : "";
   }
 
