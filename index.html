@@ -338,7 +338,7 @@
   </section>
 
   <section class="hero">
-    <div class="label">Gagné depuis que tu es sur cette page</div>
+    <div class="label" id="heroLabel">Gagné depuis que tu es sur cette page</div>
     <div class="big" id="session">0,000000 €</div>
     <div class="sub" id="sessionTime">depuis 0 s</div>
     <div class="status" id="status" hidden></div>
@@ -369,7 +369,7 @@
   <div class="section-head">
     <div>
       <h2>Toi vs le monde</h2>
-      <p>Ce que chacun a gagné depuis que tu es sur cette page.</p>
+      <p id="cmpSub">Ce que chacun a gagné depuis que tu es sur cette page.</p>
     </div>
     <div class="segmented small" id="scale" role="group" aria-label="Échelle du graphique">
       <button type="button" data-scale="linear" aria-pressed="true">Linéaire</button>
@@ -571,13 +571,17 @@
     document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
   }
 
-  // Freeze what has been earned so far this session, then restart from now with the new rate.
-  function checkpoint() {
+  // A new setting (salary, brut, tax rate, mode) restarts every live counter and the chart from zero,
+  // so nothing mixes amounts computed with the old and the new parameters.
+  const resetListeners = [];
+  function resetCounters() {
     const now = Date.now();
-    const paid = paidMsBetween(sessionStart, now);
-    sessionAccum += paid * perMs;
-    smicAccum += paid * smicPerMs;
+    sessionAccum = 0;
+    smicAccum = 0;
     sessionStart = now;
+    pageOpened = now;
+    $("heroLabel").textContent = "Gagné depuis ton dernier réglage";
+    resetListeners.forEach((fn) => fn());
   }
 
   function syncUrl() {
@@ -591,8 +595,9 @@
   }
 
   function setSalary(n) {
-    checkpoint();
+    if (n === salary) return;
     salary = n;
+    resetCounters();
     updateRates();
     try { localStorage.setItem(STORAGE_KEY, String(n)); } catch (e) {}
     syncUrl();
@@ -600,8 +605,8 @@
 
   function setMode(m) {
     if (m === mode) return;
-    checkpoint();
     mode = m;
+    resetCounters();
     updateRates();
     try { localStorage.setItem(MODE_KEY, m); } catch (e) {}
     syncUrl();
@@ -755,7 +760,7 @@
   }
 
   const els = { session: $("session"), sessionTime: $("sessionTime"), today: $("today"), year: $("year"), yearPct: $("yearPct"), status: $("status") };
-  const pageOpened = Date.now();
+  let pageOpened = Date.now(); // start of the current counting period (reset on every setting change)
   let lastStatusUpdate = 0;
 
   function updateStatus(now) {
@@ -799,7 +804,8 @@
 
   // Shared state for the comparison block below.
   window.__sfc = {
-    pageOpened,
+    get pageOpened() { return pageOpened; },
+    onReset(fn) { resetListeners.push(fn); },
     get salary() { return salary; },
     get mode() { return mode; },
     smicAnnual: SMIC_NET_ANNUAL,
@@ -924,6 +930,13 @@
   let samples = [{ t: 0, toi: 0, smic: 0, bezos: 0, musk: 0 }];
   let sampleEvery = 200;
   let lastSample = 0;
+  S.onReset(() => {
+    samples = [{ t: 0, toi: 0, smic: 0, bezos: 0, musk: 0 }];
+    sampleEvery = 200;
+    lastSample = 0;
+    lastText = 0;
+    $("cmpSub").textContent = "Ce que chacun a gagné depuis ton dernier réglage.";
+  });
   function sample(now) {
     const t = now - S.pageOpened;
     if (t - lastSample < sampleEvery) return;
